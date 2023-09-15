@@ -22,7 +22,7 @@ import (
 	"goji.io/pat"
 	"golang.org/x/crypto/bcrypt"
 
-	"net/http/pprof"
+	_ "net/http/pprof"
 )
 
 const (
@@ -281,11 +281,10 @@ func init() {
 }
 
 func main() {
-	runtime.SetBlockProfileRate(1)
-   	runtime.SetMutexProfileFraction(1)
    	go func() {
     	log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
 	}()
+
 	host := os.Getenv("MYSQL_HOST")
 	if host == "" {
 		host = "127.0.0.1"
