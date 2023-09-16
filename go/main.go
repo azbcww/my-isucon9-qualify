@@ -23,6 +23,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	_ "net/http/pprof"
+	"github.com/bradfitz/gomemcache/memcache"
 )
 
 const (
@@ -65,6 +66,7 @@ var (
 	templates *template.Template
 	dbx       *sqlx.DB
 	store     sessions.Store
+	mc *memcache.Client
 )
 
 type Config struct {
@@ -281,8 +283,11 @@ func init() {
 }
 
 func main() {
-   	go func() {
-    	log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
+	mc = memcache.New("127.0.0.1:11211")
+	defer mc.Close()
+
+	go func() {
+		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
 	}()
 
 	host := os.Getenv("MYSQL_HOST")
@@ -414,15 +419,42 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 }
 
 func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
-	err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
-	if category.ParentID != 0 {
-		parentCategory, err := getCategoryByID(q, category.ParentID)
-		if err != nil {
+	var it *memcache.Item
+	cacheName := "categoryID_" + strconv.Itoa(categoryID)
+	it, cache_err := mc.Get(cacheName)
+
+	if cache_err != nil {
+		err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
+		if category.ParentID != 0 {
+			parentCategory, err := getCategoryByID(q, category.ParentID)
+			if err != nil {
+				return category, err
+			}
+			category.ParentCategoryName = parentCategory.CategoryName
+		}
+
+		jsonData, json_err := json.Marshal(category)
+		if json_err != nil {
 			return category, err
 		}
-		category.ParentCategoryName = parentCategory.CategoryName
+		mc.Set(&memcache.Item{Key:cacheName, Value:jsonData, Expiration: 10})
+		return category, err
+	}else{
+		var categoryData Category
+		if err := json.Unmarshal(it.Value, &categoryData); err != nil {
+			fmt.Println(err)
+		}
+		return categoryData, nil
 	}
-	return category, err
+	//err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
+	//if category.ParentID != 0 {
+	//	parentCategory, err := getCategoryByID(q, category.ParentID)
+	//	if err != nil {
+	//		return category, err
+	//	}
+	//	category.ParentCategoryName = parentCategory.CategoryName
+	//}
+	//return category, err
 }
 
 func getConfigByName(name string) (string, error) {
