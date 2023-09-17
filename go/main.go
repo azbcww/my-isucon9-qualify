@@ -394,6 +394,35 @@ func getUser(r *http.Request) (user User, errCode int, errMsg string) {
 		return user, http.StatusNotFound, "no session"
 	}
 
+	var it *memcache.Item
+	cacheName := "userID_" + strconv.FormatInt(userID.(int64),10)
+	it, cache_err := mc.Get(cacheName)
+
+	if cache_err != nil {
+
+		err := dbx.Get(&user, "SELECT * FROM `users` WHERE `id` = ?", userID)
+		if err == sql.ErrNoRows {
+			return user, http.StatusNotFound, "user not found"
+		}
+		if err != nil {
+			log.Print(err)
+			return user, http.StatusInternalServerError, "db error"
+		}
+		jsonData, json_err := json.Marshal(user)
+		if json_err != nil {
+			log.Println(json_err)
+		}
+
+		mc.Set(&memcache.Item{Key:cacheName, Value:jsonData, Expiration:10})
+		return user, http.StatusOK, ""
+	}else {
+		var user User
+		if err := json.Unmarshal(it.Value, &user); err != nil {
+			log.Println(err)
+		}
+		return user, http.StatusOK, ""
+	}
+	/*
 	err := dbx.Get(&user, "SELECT * FROM `users` WHERE `id` = ?", userID)
 	if err == sql.ErrNoRows {
 		return user, http.StatusNotFound, "user not found"
@@ -404,18 +433,42 @@ func getUser(r *http.Request) (user User, errCode int, errMsg string) {
 	}
 
 	return user, http.StatusOK, ""
+	*/
 }
 
 func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err error) {
 	user := User{}
-	err = sqlx.Get(q, &user, "SELECT * FROM `users` WHERE `id` = ?", userID)
-	if err != nil {
+
+	var it *memcache.Item
+	cacheName := "userID_" + strconv.FormatInt(userID,10)
+	it, cache_err := mc.Get(cacheName)
+
+	if cache_err != nil {
+		err = sqlx.Get(q, &user, "SELECT * FROM `users` WHERE `id` = ?", userID)
+		if err != nil {
+			return userSimple, err
+		}
+
+		jsonData, json_err := json.Marshal(user)
+		if json_err != nil {
+			log.Println(json_err)
+		}
+
+		mc.Set(&memcache.Item{Key:cacheName, Value:jsonData, Expiration:10})
+
+		userSimple.ID = user.ID
+		userSimple.AccountName = user.AccountName
+		userSimple.NumSellItems = user.NumSellItems
 		return userSimple, err
+	}else {
+		if err := json.Unmarshal(it.Value, &user); err != nil {
+			log.Println(err)
+		}
+		userSimple.ID = user.ID
+		userSimple.AccountName = user.AccountName
+		userSimple.NumSellItems = user.NumSellItems
+		return userSimple, nil
 	}
-	userSimple.ID = user.ID
-	userSimple.AccountName = user.AccountName
-	userSimple.NumSellItems = user.NumSellItems
-	return userSimple, err
 }
 
 func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
@@ -446,15 +499,17 @@ func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err err
 		}
 		return categoryData, nil
 	}
-	//err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
-	//if category.ParentID != 0 {
-	//	parentCategory, err := getCategoryByID(q, category.ParentID)
-	//	if err != nil {
-	//		return category, err
-	//	}
-	//	category.ParentCategoryName = parentCategory.CategoryName
-	//}
-	//return category, err
+	/*
+	err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
+	if category.ParentID != 0 {
+		parentCategory, err := getCategoryByID(q, category.ParentID)
+		if err != nil {
+			return category, err
+		}
+		category.ParentCategoryName = parentCategory.CategoryName
+	}
+	return category, err
+	*/
 }
 
 func getConfigByName(name string) (string, error) {
@@ -2057,6 +2112,24 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		return
 	}
+	cacheName := "userID_" + strconv.FormatInt(seller.ID, 10)
+	it, cache_err := mc.Get(cacheName)
+	if cache_err != nil {
+		log.Println(cache_err)
+	}else{
+		var user User
+		if err := json.Unmarshal(it.Value, &user); err != nil {
+			log.Println(err)
+		}
+		user.NumSellItems = seller.NumSellItems+1
+		user.LastBump = now
+		jsonData, json_err := json.Marshal(user)
+		if json_err != nil {
+			log.Println(json_err)
+		}
+		mc.Set(&memcache.Item{Key:cacheName, Value:jsonData, Expiration: 60})
+	}
+
 	tx.Commit()
 
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
@@ -2156,6 +2229,23 @@ func postBump(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		return
+	}
+
+	cacheName := "userID_" + strconv.FormatInt(seller.ID,10)
+	it, cache_err := mc.Get(cacheName)
+	if cache_err != nil {
+		log.Println(cache_err)
+	}else{
+		var user User
+		if err := json.Unmarshal(it.Value, &user); err != nil {
+			log.Println(err)
+		}
+		user.LastBump = now
+		jsonData, json_err := json.Marshal(user)
+		if json_err != nil {
+			log.Println(json_err)
+		}
+		mc.Set(&memcache.Item{Key:cacheName, Value:jsonData, Expiration: 60})
 	}
 
 	err = tx.Get(&targetItem, "SELECT * FROM `items` WHERE `id` = ?", itemID)
