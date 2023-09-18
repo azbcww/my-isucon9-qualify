@@ -23,6 +23,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	_ "net/http/pprof"
+
 	"github.com/bradfitz/gomemcache/memcache"
 )
 
@@ -66,7 +67,7 @@ var (
 	templates *template.Template
 	dbx       *sqlx.DB
 	store     sessions.Store
-	mc *memcache.Client
+	mc        *memcache.Client
 )
 
 type Config struct {
@@ -395,7 +396,7 @@ func getUser(r *http.Request) (user User, errCode int, errMsg string) {
 	}
 
 	var it *memcache.Item
-	cacheName := "userID_" + strconv.FormatInt(userID.(int64),10)
+	cacheName := "userID_" + strconv.FormatInt(userID.(int64), 10)
 	it, cache_err := mc.Get(cacheName)
 
 	if cache_err != nil {
@@ -413,9 +414,9 @@ func getUser(r *http.Request) (user User, errCode int, errMsg string) {
 			log.Println(json_err)
 		}
 
-		mc.Set(&memcache.Item{Key:cacheName, Value:jsonData, Expiration:10})
+		mc.Set(&memcache.Item{Key: cacheName, Value: jsonData, Expiration: 10})
 		return user, http.StatusOK, ""
-	}else {
+	} else {
 		var user User
 		if err := json.Unmarshal(it.Value, &user); err != nil {
 			log.Println(err)
@@ -423,16 +424,16 @@ func getUser(r *http.Request) (user User, errCode int, errMsg string) {
 		return user, http.StatusOK, ""
 	}
 	/*
-	err := dbx.Get(&user, "SELECT * FROM `users` WHERE `id` = ?", userID)
-	if err == sql.ErrNoRows {
-		return user, http.StatusNotFound, "user not found"
-	}
-	if err != nil {
-		log.Print(err)
-		return user, http.StatusInternalServerError, "db error"
-	}
+		err := dbx.Get(&user, "SELECT * FROM `users` WHERE `id` = ?", userID)
+		if err == sql.ErrNoRows {
+			return user, http.StatusNotFound, "user not found"
+		}
+		if err != nil {
+			log.Print(err)
+			return user, http.StatusInternalServerError, "db error"
+		}
 
-	return user, http.StatusOK, ""
+		return user, http.StatusOK, ""
 	*/
 }
 
@@ -440,7 +441,7 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 	user := User{}
 
 	var it *memcache.Item
-	cacheName := "userID_" + strconv.FormatInt(userID,10)
+	cacheName := "userID_" + strconv.FormatInt(userID, 10)
 	it, cache_err := mc.Get(cacheName)
 
 	if cache_err != nil {
@@ -454,13 +455,13 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 			log.Println(json_err)
 		}
 
-		mc.Set(&memcache.Item{Key:cacheName, Value:jsonData, Expiration:10})
+		mc.Set(&memcache.Item{Key: cacheName, Value: jsonData, Expiration: 10})
 
 		userSimple.ID = user.ID
 		userSimple.AccountName = user.AccountName
 		userSimple.NumSellItems = user.NumSellItems
 		return userSimple, err
-	}else {
+	} else {
 		if err := json.Unmarshal(it.Value, &user); err != nil {
 			log.Println(err)
 		}
@@ -490,9 +491,9 @@ func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err err
 		if json_err != nil {
 			return category, err
 		}
-		mc.Set(&memcache.Item{Key:cacheName, Value:jsonData, Expiration: 10})
+		mc.Set(&memcache.Item{Key: cacheName, Value: jsonData, Expiration: 10})
 		return category, err
-	}else{
+	} else {
 		var categoryData Category
 		if err := json.Unmarshal(it.Value, &categoryData); err != nil {
 			fmt.Println(err)
@@ -500,15 +501,15 @@ func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err err
 		return categoryData, nil
 	}
 	/*
-	err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
-	if category.ParentID != 0 {
-		parentCategory, err := getCategoryByID(q, category.ParentID)
-		if err != nil {
-			return category, err
+		err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
+		if category.ParentID != 0 {
+			parentCategory, err := getCategoryByID(q, category.ParentID)
+			if err != nil {
+				return category, err
+			}
+			category.ParentCategoryName = parentCategory.CategoryName
 		}
-		category.ParentCategoryName = parentCategory.CategoryName
-	}
-	return category, err
+		return category, err
 	*/
 }
 
@@ -965,8 +966,28 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	if itemID > 0 && createdAt > 0 {
 		// paging
 		err := tx.Select(&items,
-			"SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			// "SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			// user.ID,
+			// user.ID,
+			// ItemStatusOnSale,
+			// ItemStatusTrading,
+			// ItemStatusSoldOut,
+			// ItemStatusCancel,
+			// ItemStatusStop,
+			// time.Unix(createdAt, 0),
+			// time.Unix(createdAt, 0),
+			// itemID,
+			// TransactionsPerPage+1,
+			"SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) UNION ALL SELECT * FROM `items` WHERE `buyer_id` = ? AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			user.ID,
+			ItemStatusOnSale,
+			ItemStatusTrading,
+			ItemStatusSoldOut,
+			ItemStatusCancel,
+			ItemStatusStop,
+			time.Unix(createdAt, 0),
+			time.Unix(createdAt, 0),
+			itemID,
 			user.ID,
 			ItemStatusOnSale,
 			ItemStatusTrading,
@@ -2116,18 +2137,18 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 	it, cache_err := mc.Get(cacheName)
 	if cache_err != nil {
 		log.Println(cache_err)
-	}else{
+	} else {
 		var user User
 		if err := json.Unmarshal(it.Value, &user); err != nil {
 			log.Println(err)
 		}
-		user.NumSellItems = seller.NumSellItems+1
+		user.NumSellItems = seller.NumSellItems + 1
 		user.LastBump = now
 		jsonData, json_err := json.Marshal(user)
 		if json_err != nil {
 			log.Println(json_err)
 		}
-		mc.Set(&memcache.Item{Key:cacheName, Value:jsonData, Expiration: 60})
+		mc.Set(&memcache.Item{Key: cacheName, Value: jsonData, Expiration: 60})
 	}
 
 	tx.Commit()
@@ -2231,11 +2252,11 @@ func postBump(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cacheName := "userID_" + strconv.FormatInt(seller.ID,10)
+	cacheName := "userID_" + strconv.FormatInt(seller.ID, 10)
 	it, cache_err := mc.Get(cacheName)
 	if cache_err != nil {
 		log.Println(cache_err)
-	}else{
+	} else {
 		var user User
 		if err := json.Unmarshal(it.Value, &user); err != nil {
 			log.Println(err)
@@ -2245,7 +2266,7 @@ func postBump(w http.ResponseWriter, r *http.Request) {
 		if json_err != nil {
 			log.Println(json_err)
 		}
-		mc.Set(&memcache.Item{Key:cacheName, Value:jsonData, Expiration: 60})
+		mc.Set(&memcache.Item{Key: cacheName, Value: jsonData, Expiration: 60})
 	}
 
 	err = tx.Get(&targetItem, "SELECT * FROM `items` WHERE `id` = ?", itemID)
