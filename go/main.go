@@ -963,22 +963,32 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 	tx := dbx.MustBegin()
 	items := []Item{}
+	itemsSeller := []Item{}
+	itemsBuyer := []Item{}
 	if itemID > 0 && createdAt > 0 {
 		// paging
-		err := tx.Select(&items,
-			// "SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			// user.ID,
-			// user.ID,
-			// ItemStatusOnSale,
-			// ItemStatusTrading,
-			// ItemStatusSoldOut,
-			// ItemStatusCancel,
-			// ItemStatusStop,
-			// time.Unix(createdAt, 0),
-			// time.Unix(createdAt, 0),
-			// itemID,
-			// TransactionsPerPage+1,
-			"SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) UNION ALL SELECT * FROM `items` WHERE `buyer_id` = ? AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		// err := tx.Select(&items,
+		// 	"SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		// 	user.ID,
+		// 	user.ID,
+		// 	ItemStatusOnSale,
+		// 	ItemStatusTrading,
+		// 	ItemStatusSoldOut,
+		// 	ItemStatusCancel,
+		// 	ItemStatusStop,
+		// 	time.Unix(createdAt, 0),
+		// 	time.Unix(createdAt, 0),
+		// 	itemID,
+		// 	TransactionsPerPage+1,
+		// )
+		// if err != nil {
+		// 	log.Print(err)
+		// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		// 	tx.Rollback()
+		// 	return
+		// }
+		err := tx.Select(&itemsSeller,
+			"SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			user.ID,
 			ItemStatusOnSale,
 			ItemStatusTrading,
@@ -988,6 +998,17 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			time.Unix(createdAt, 0),
 			time.Unix(createdAt, 0),
 			itemID,
+			TransactionsPerPage+1,
+		)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return
+		}
+
+		err = tx.Select(&itemsBuyer,
+			"SELECT * FROM `items` WHERE `buyer_id` = ? AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			user.ID,
 			ItemStatusOnSale,
 			ItemStatusTrading,
@@ -1007,23 +1028,26 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// 1st page
-		err := tx.Select(&items,
-			// "SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			// user.ID,
-			// user.ID,
-			// ItemStatusOnSale,
-			// ItemStatusTrading,
-			// ItemStatusSoldOut,
-			// ItemStatusCancel,
-			// ItemStatusStop,
-			// TransactionsPerPage+1,
-			"SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?,?,?) UNION ALL SELECT * FROM `items` WHERE `buyer_id` = ? AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			user.ID,
-			ItemStatusOnSale,
-			ItemStatusTrading,
-			ItemStatusSoldOut,
-			ItemStatusCancel,
-			ItemStatusStop,
+		// err := tx.Select(&items,
+		// 	"SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		// 	user.ID,
+		// 	user.ID,
+		// 	ItemStatusOnSale,
+		// 	ItemStatusTrading,
+		// 	ItemStatusSoldOut,
+		// 	ItemStatusCancel,
+		// 	ItemStatusStop,
+		// 	TransactionsPerPage+1,
+		// )
+		// if err != nil {
+		// 	log.Print(err)
+		// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		// 	tx.Rollback()
+		// 	return
+		// }
+
+		err := tx.Select(&itemsSeller,
+			"SELECT * FROM `items` WHERE `seller_id` = ? AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			user.ID,
 			ItemStatusOnSale,
 			ItemStatusTrading,
@@ -1038,6 +1062,66 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			tx.Rollback()
 			return
 		}
+
+		err = tx.Select(&itemsBuyer,
+			"SELECT * FROM `items` WHERE `buyer_id` = ? AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			user.ID,
+			ItemStatusOnSale,
+			ItemStatusTrading,
+			ItemStatusSoldOut,
+			ItemStatusCancel,
+			ItemStatusStop,
+			TransactionsPerPage+1,
+		)
+		if err != nil {
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return
+		}
+	}
+
+	idxSeller := 0
+	idxBuyer := 0
+	if (len(itemsSeller) > 0) && (len(itemsBuyer) > 0) {
+		for (idxSeller < len(itemsSeller)) && (idxBuyer < len(itemsBuyer)) {
+			if TransactionsPerPage+1 <= len(items) {
+				break
+			}
+			s := itemsSeller[idxSeller]
+			b := itemsBuyer[idxBuyer]
+
+			if s.CreatedAt.Before(b.CreatedAt) {
+				//sの方が早い -> bの方が遅い(売買が行われた日時が新しい)ので表示時上に来てほしい
+				items = append(items, b)
+				idxBuyer++
+			} else if s.CreatedAt.After(b.CreatedAt) {
+				items = append(items, s)
+				idxSeller++
+			} else {
+				if s.ID > b.ID {
+					items = append(items, s)
+					idxSeller++
+				} else {
+					items = append(items, b)
+					idxBuyer++
+				}
+			}
+		}
+	}
+	for idxSeller < len(itemsSeller) {
+		if TransactionsPerPage+1 <= len(items) {
+			break
+		}
+		items = append(items, itemsSeller[idxSeller])
+		idxSeller++
+	}
+	for idxBuyer < len(itemsBuyer) {
+		if TransactionsPerPage+1 <= len(items) {
+			break
+		}
+		items = append(items, itemsSeller[idxBuyer])
+		idxBuyer++
 	}
 
 	itemDetails := []ItemDetail{}
