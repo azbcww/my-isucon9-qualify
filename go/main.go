@@ -1120,7 +1120,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		if TransactionsPerPage+1 <= len(items) {
 			break
 		}
-		items = append(items, itemsSeller[idxBuyer])
+		items = append(items, itemsBuyer[idxBuyer])
 		idxBuyer++
 	}
 
