@@ -932,7 +932,7 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 }
 
 var (
-	categories = map[int]Category{}{
+	categories = map[int]Category{
 		1: Category{ID: 1, ParentID: 0, CategoryName: "ソファー"},
 		2: Category{ID: 2, ParentID: 1, CategoryName: "一人掛けソファー", ParentCategoryName: "ソファー"},
 		3: Category{ID: 3, ParentID: 1, CategoryName: "二人掛けソファー", ParentCategoryName: "ソファー"},
@@ -947,7 +947,7 @@ var (
 		15: Category{ID: 15, ParentID: 10, CategoryName: "カウンターチェア", ParentCategoryName: "家庭用チェア"},
 		20: Category{ID: 20, ParentID: 0, CategoryName: "キッズチェア"},
 		21: Category{ID: 21, ParentID: 20, CategoryName: "学習チェア", ParentCategoryName: "キッズチェア"},
-		22: Category{ID: 22, ParentID: 20, CategoryName: "ベビーチェア", ParentCategoryName: "キッズチェア"},
+		22: Category{ID: 22, ParentID: 20, CategoryName: "ベビーソファ", ParentCategoryName: "キッズチェア"},
 		23: Category{ID: 23, ParentID: 20, CategoryName: "キッズハイチェア", ParentCategoryName: "キッズチェア"},
 		24: Category{ID: 24, ParentID: 20, CategoryName: "テーブルチェア", ParentCategoryName: "キッズチェア"},
 		30: Category{ID: 30, ParentID: 0, CategoryName: "オフィスチェア"},
@@ -1181,8 +1181,9 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// category, err := getCategoryByID(tx, item.CategoryID)
-		category, err := categories[item.CategoryID]
-		if err != nil {
+		category, ok := categories[item.CategoryID]
+		//if err != nil {
+		if ok==false {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			// tx.Rollback()
 			return
