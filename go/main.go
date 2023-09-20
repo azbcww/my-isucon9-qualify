@@ -933,12 +933,12 @@ func getUserItems(w http.ResponseWriter, r *http.Request) {
 
 var (
 	categories = map[int]Category{
-		1: Category{ID: 1, ParentID: 0, CategoryName: "ソファー"},
-		2: Category{ID: 2, ParentID: 1, CategoryName: "一人掛けソファー", ParentCategoryName: "ソファー"},
-		3: Category{ID: 3, ParentID: 1, CategoryName: "二人掛けソファー", ParentCategoryName: "ソファー"},
-		4: Category{ID: 4, ParentID: 1, CategoryName: "コーナーソファー", ParentCategoryName: "ソファー"},
-		5: Category{ID: 5, ParentID: 1, CategoryName: "二段ソファー", ParentCategoryName: "ソファー"},
-		6: Category{ID: 6, ParentID: 1, CategoryName: "ソファーベッド", ParentCategoryName: "ソファー"},
+		1:  Category{ID: 1, ParentID: 0, CategoryName: "ソファー"},
+		2:  Category{ID: 2, ParentID: 1, CategoryName: "一人掛けソファー", ParentCategoryName: "ソファー"},
+		3:  Category{ID: 3, ParentID: 1, CategoryName: "二人掛けソファー", ParentCategoryName: "ソファー"},
+		4:  Category{ID: 4, ParentID: 1, CategoryName: "コーナーソファー", ParentCategoryName: "ソファー"},
+		5:  Category{ID: 5, ParentID: 1, CategoryName: "二段ソファー", ParentCategoryName: "ソファー"},
+		6:  Category{ID: 6, ParentID: 1, CategoryName: "ソファーベッド", ParentCategoryName: "ソファー"},
 		10: Category{ID: 10, ParentID: 0, CategoryName: "家庭用チェア"},
 		11: Category{ID: 11, ParentID: 10, CategoryName: "スツール", ParentCategoryName: "家庭用チェア"},
 		12: Category{ID: 12, ParentID: 10, CategoryName: "クッションスツール", ParentCategoryName: "家庭用チェア"},
@@ -978,6 +978,12 @@ var (
 		66: Category{ID: 66, ParentID: 60, CategoryName: "空気椅子", ParentCategoryName: "座椅子"},
 	}
 )
+
+type TransactionAndShipp struct {
+	ID        int64  `json:"id" db:"id"`
+	Status    string `json:"status" db:"status"`
+	ReserveID string `json:"reserve_id"`
+}
 
 func getTransactions(w http.ResponseWriter, r *http.Request) {
 
@@ -1183,7 +1189,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		// category, err := getCategoryByID(tx, item.CategoryID)
 		category, ok := categories[item.CategoryID]
 		//if err != nil {
-		if ok==false {
+		if ok == false {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
 			// tx.Rollback()
 			return
@@ -1219,8 +1225,9 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			itemDetail.Buyer = &buyer
 		}
 
-		transactionEvidence := TransactionEvidence{}
-		err = tx.Get(&transactionEvidence, "SELECT * FROM `transaction_evidences` WHERE `item_id` = ?", item.ID)
+		transactionAndShipp := TransactionAndShipp{}
+		err = tx.Get(&transactionAndShipp, "SELECT t.id, t.status ,s.reserve_id FROM transaction_evidences t INNER JOIN shippings s ON t.id = s.transaction_evidence_id WHERE t.item_id = (?)",
+					item.ID)
 		if err != nil && err != sql.ErrNoRows {
 			// It's able to ignore ErrNoRows
 			log.Print(err)
@@ -1229,22 +1236,17 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if transactionEvidence.ID > 0 {
-			shipping := Shipping{}
-			err = tx.Get(&shipping, "SELECT * FROM `shippings` WHERE `transaction_evidence_id` = ?", transactionEvidence.ID)
-			if err == sql.ErrNoRows {
-				outputErrorMsg(w, http.StatusNotFound, "shipping not found")
-				tx.Rollback()
-				return
-			}
-			if err != nil {
-				log.Print(err)
-				outputErrorMsg(w, http.StatusInternalServerError, "db error")
-				tx.Rollback()
-				return
-			}
+		if err != nil && err != sql.ErrNoRows {
+			// It's able to ignore ErrNoRows
+			log.Print(err)
+			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			tx.Rollback()
+			return
+		}
+
+		if transactionAndShipp.ID > 0 {
 			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
-				ReserveID: shipping.ReserveID,
+				ReserveID: transactionAndShipp.ReserveID,
 			})
 			if err != nil {
 				log.Print(err)
@@ -1253,10 +1255,49 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			itemDetail.TransactionEvidenceID = transactionEvidence.ID
-			itemDetail.TransactionEvidenceStatus = transactionEvidence.Status
+			itemDetail.TransactionEvidenceID = transactionAndShipp.ID
+			itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
 			itemDetail.ShippingStatus = ssr.Status
 		}
+
+		// transactionEvidence := TransactionEvidence{}
+		// err = tx.Get(&transactionEvidence, "SELECT * FROM `transaction_evidences` WHERE `item_id` = ?", item.ID)
+		// if err != nil && err != sql.ErrNoRows {
+		// 	// It's able to ignore ErrNoRows
+		// 	log.Print(err)
+		// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		// 	tx.Rollback()
+		// 	return
+		// }
+
+		// if transactionEvidence.ID > 0 {
+		// 	shipping := Shipping{}
+		// 	err = tx.Get(&shipping, "SELECT * FROM `shippings` WHERE `transaction_evidence_id` = ?", transactionEvidence.ID)
+		// 	if err == sql.ErrNoRows {
+		// 		outputErrorMsg(w, http.StatusNotFound, "shipping not found")
+		// 		tx.Rollback()
+		// 		return
+		// 	}
+		// 	if err != nil {
+		// 		log.Print(err)
+		// 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		// 		tx.Rollback()
+		// 		return
+		// 	}
+		// 	ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
+		// 		ReserveID: shipping.ReserveID,
+		// 	})
+		// 	if err != nil {
+		// 		log.Print(err)
+		// 		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
+		// 		tx.Rollback()
+		// 		return
+		// 	}
+
+		// 	itemDetail.TransactionEvidenceID = transactionEvidence.ID
+		// 	itemDetail.TransactionEvidenceStatus = transactionEvidence.Status
+		// 	itemDetail.ShippingStatus = ssr.Status
+		// }
 
 		itemDetails = append(itemDetails, itemDetail)
 	}
