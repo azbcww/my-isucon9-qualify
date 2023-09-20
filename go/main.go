@@ -1226,16 +1226,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 
 		transactionAndShipp := TransactionAndShipp{}
-		err = tx.Get(&transactionAndShipp, "SELECT t.id, t.status ,s.reserve_id FROM transaction_evidences t INNER JOIN shippings s ON t.id = s.transaction_evidence_id WHERE t.item_id = (?)",
+		err = tx.Get(&transactionAndShipp, "SELECT t.id, t.status ,s.reserve_id FROM transaction_evidences t INNER JOIN shippings s ON t.id = s.transaction_evidence_id WHERE t.item_id = ?",
 					item.ID)
-		if err != nil && err != sql.ErrNoRows {
-			// It's able to ignore ErrNoRows
-			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
-			tx.Rollback()
-			return
-		}
-
 		if err != nil && err != sql.ErrNoRows {
 			// It's able to ignore ErrNoRows
 			log.Print(err)
@@ -1268,7 +1260,6 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		// 	tx.Rollback()
 		// 	return
-		// }
 
 		// if transactionEvidence.ID > 0 {
 		// 	shipping := Shipping{}
