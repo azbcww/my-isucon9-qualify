@@ -1245,7 +1245,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if transactionAndShipp.ID > 0 {
+		if transactionAndShipp.ID > 0 && transactionAndShipp.Status != "done"{
 			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 				ReserveID: transactionAndShipp.ReserveID,
 			})
@@ -1259,6 +1259,10 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			itemDetail.TransactionEvidenceID = transactionAndShipp.ID
 			itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
 			itemDetail.ShippingStatus = ssr.Status
+		}else{
+			itemDetail.TransactionEvidenceID = transactionAndShipp.ID
+            itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
+            itemDetail.ShippingStatus = transactionAndShipp.Status
 		}
 
 		// transactionEvidence := TransactionEvidence{}
