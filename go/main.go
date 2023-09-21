@@ -1247,7 +1247,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if transactionAndShipp.ID > 0 {
+		if transactionAndShipp.ID > 0 && transactionAndShipp.Status != "done"{
 			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 				ReserveID: transactionAndShipp.ReserveID,
 			})
