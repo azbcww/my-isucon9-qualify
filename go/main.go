@@ -25,6 +25,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/bradfitz/gomemcache/memcache"
+	"github.com/felixge/fgprof"
 )
 
 const (
@@ -286,7 +287,8 @@ func init() {
 func main() {
 	mc = memcache.New("127.0.0.1:11211")
 	defer mc.Close()
-
+	
+	http.DefaultServeMux.Handle("debug/fgprof", fgprof.Handler())
 	go func() {
 		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
 	}()
@@ -1245,7 +1247,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if transactionAndShipp.ID > 0 && transactionAndShipp.Status != "done"{
+		if transactionAndShipp.ID > 0 {
 			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 				ReserveID: transactionAndShipp.ReserveID,
 			})
@@ -1259,10 +1261,6 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			itemDetail.TransactionEvidenceID = transactionAndShipp.ID
 			itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
 			itemDetail.ShippingStatus = ssr.Status
-		}else{
-			itemDetail.TransactionEvidenceID = transactionAndShipp.ID
-            itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
-            itemDetail.ShippingStatus = transactionAndShipp.Status
 		}
 
 		// transactionEvidence := TransactionEvidence{}
