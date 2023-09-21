@@ -994,6 +994,7 @@ type TransactionAndShipp struct {
 	ID        int64  `json:"id" db:"id"`
 	Status    string `json:"status" db:"status"`
 	ReserveID string `json:"reserve_id" db:"reserve_id"`
+	SStatus string `json:"s_status" db:"s_status"`
 }
 
 func getTransactions(w http.ResponseWriter, r *http.Request) {
@@ -1217,17 +1218,17 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 
 		transactionAndShipp := TransactionAndShipp{}
-		err = tx.Get(&transactionAndShipp, "SELECT `t`.`id`, `t`.`status` ,`s`.`reserve_id` FROM `transaction_evidences` `t` INNER JOIN `shippings` `s` ON `t`.`id` = `s`.`transaction_evidence_id` WHERE `t`.`item_id` = ?",
+		err = tx.Get(&transactionAndShipp, "SELECT `t`.`id`, `t`.`status` ,`s`.`reserve_id`, `s`.`status` AS `s_status` FROM `transaction_evidences` `t` INNER JOIN `shippings` `s` ON `t`.`id` = `s`.`transaction_evidence_id` WHERE `t`.`item_id` = ?",
 					item.ID)
 		if err != nil && err != sql.ErrNoRows {
 			// It's able to ignore ErrNoRows
 			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
+			outputErrorMsg(w, http.StatusInternalServerError, err.Error())
 			tx.Rollback()
 			return
 		}
-
-		if transactionAndShipp.ID > 0 && transactionAndShipp.Status != "done"{
+		/*
+		if transactionAndShipp.ID > 0 && transactionAndShipp.Status == {
 			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 				ReserveID: transactionAndShipp.ReserveID,
 			})
@@ -1241,11 +1242,10 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			itemDetail.TransactionEvidenceID = transactionAndShipp.ID
 			itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
 			itemDetail.ShippingStatus = ssr.Status
-		}else{
-			itemDetail.TransactionEvidenceID = transactionAndShipp.ID
-			itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
-			itemDetail.ShippingStatus = transactionAndShipp.Status
-		}
+		}*/
+		itemDetail.TransactionEvidenceID = transactionAndShipp.ID
+		itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
+		itemDetail.ShippingStatus = transactionAndShipp.SStatus
 
 		// transactionEvidence := TransactionEvidence{}
 		// err = tx.Get(&transactionEvidence, "SELECT * FROM `transaction_evidences` WHERE `item_id` = ?", item.ID)
