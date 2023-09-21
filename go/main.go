@@ -1261,8 +1261,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			itemDetail.ShippingStatus = ssr.Status
 		}else{
 			itemDetail.TransactionEvidenceID = transactionAndShipp.ID
-            itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
-            itemDetail.ShippingStatus = transactionAndShipp.Status
+			itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
+			itemDetail.ShippingStatus = transactionAndShipp.Status
 		}
 
 		// transactionEvidence := TransactionEvidence{}
