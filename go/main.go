@@ -287,8 +287,8 @@ func init() {
 func main() {
 	mc = memcache.New("127.0.0.1:11211")
 	defer mc.Close()
-	
-	http.DefaultServeMux.Handle("debug/fgprof", fgprof.Handler())
+
+	http.DefaultServeMux.Handle("/debug/fgprof", fgprof.Handler())
 	go func() {
 		log.Println(http.ListenAndServe("0.0.0.0:6060", nil))
 	}()
