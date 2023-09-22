@@ -1124,7 +1124,10 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		// }
 
 		err := tx.Select(&items,
-			"SELECT * FROM `items` WHERE `seller_id` = ? UNIO ALL SELECT * FROM `items` WHERE `buyer_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			"SELECT * FROM `items` WHERE `seller_id` = ? UNION ALL SELECT * FROM `items` WHERE `buyer_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			user.ID,
+			user.ID,
+			TransactionsPerPage+1,
 		)
 
 		if err != nil {
