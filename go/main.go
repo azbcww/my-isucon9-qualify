@@ -1103,73 +1103,83 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		// 	return
 		// }
 
-		err := tx.Select(&itemsSeller,
-			"SELECT * FROM `items` WHERE `seller_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			user.ID,
-			TransactionsPerPage+1,
+		err := tx.Select(&items,
+			"SELECT * FROM `items` WHERE `seller_id` = ? UNION SELECT * FROM `items` WHERE `buyer_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 		)
+
 		if err != nil {
 			log.Print(err)
 			outputErrorMsg(w, http.StatusInternalServerError, "db error")
 			tx.Rollback()
 			return
 		}
+		// err := tx.Select(&itemsSeller,
+		// 	"SELECT * FROM `items` WHERE `seller_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		// 	user.ID,
+		// 	TransactionsPerPage+1,
+		// )
+		// if err != nil {
+		// 	log.Print(err)
+		// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		// 	tx.Rollback()
+		// 	return
+		// }
 
-		err = tx.Select(&itemsBuyer,
-			"SELECT * FROM `items` WHERE `buyer_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			user.ID,
-			TransactionsPerPage+1,
-		)
-		if err != nil {
-			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
-			tx.Rollback()
-			return
-		}
+		// err = tx.Select(&itemsBuyer,
+		// 	"SELECT * FROM `items` WHERE `buyer_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		// 	user.ID,
+		// 	TransactionsPerPage+1,
+		// )
+		// if err != nil {
+		// 	log.Print(err)
+		// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		// 	tx.Rollback()
+		// 	return
+		// }
 	}
 
-	idxSeller := 0
-	idxBuyer := 0
-	if (len(itemsSeller) > 0) && (len(itemsBuyer) > 0) {
-		for (idxSeller < len(itemsSeller)) && (idxBuyer < len(itemsBuyer)) {
-			if TransactionsPerPage+1 <= len(items) {
-				break
-			}
-			s := itemsSeller[idxSeller]
-			b := itemsBuyer[idxBuyer]
+	// idxSeller := 0
+	// idxBuyer := 0
+	// if (len(itemsSeller) > 0) && (len(itemsBuyer) > 0) {
+	// 	for (idxSeller < len(itemsSeller)) && (idxBuyer < len(itemsBuyer)) {
+	// 		if TransactionsPerPage+1 <= len(items) {
+	// 			break
+	// 		}
+	// 		s := itemsSeller[idxSeller]
+	// 		b := itemsBuyer[idxBuyer]
 
-			if s.CreatedAt.Before(b.CreatedAt) {
-				//sの方が早い -> bの方が遅い(売買が行われた日時が新しい)ので表示時上に来てほしい
-				items = append(items, b)
-				idxBuyer++
-			} else if s.CreatedAt.After(b.CreatedAt) {
-				items = append(items, s)
-				idxSeller++
-			} else {
-				if s.ID > b.ID {
-					items = append(items, s)
-					idxSeller++
-				} else {
-					items = append(items, b)
-					idxBuyer++
-				}
-			}
-		}
-	}
-	for idxSeller < len(itemsSeller) {
-		if TransactionsPerPage+1 <= len(items) {
-			break
-		}
-		items = append(items, itemsSeller[idxSeller])
-		idxSeller++
-	}
-	for idxBuyer < len(itemsBuyer) {
-		if TransactionsPerPage+1 <= len(items) {
-			break
-		}
-		items = append(items, itemsBuyer[idxBuyer])
-		idxBuyer++
-	}
+	// 		if s.CreatedAt.Before(b.CreatedAt) {
+	// 			//sの方が早い -> bの方が遅い(売買が行われた日時が新しい)ので表示時上に来てほしい
+	// 			items = append(items, b)
+	// 			idxBuyer++
+	// 		} else if s.CreatedAt.After(b.CreatedAt) {
+	// 			items = append(items, s)
+	// 			idxSeller++
+	// 		} else {
+	// 			if s.ID > b.ID {
+	// 				items = append(items, s)
+	// 				idxSeller++
+	// 			} else {
+	// 				items = append(items, b)
+	// 				idxBuyer++
+	// 			}
+	// 		}
+	// 	}
+	// }
+	// for idxSeller < len(itemsSeller) {
+	// 	if TransactionsPerPage+1 <= len(items) {
+	// 		break
+	// 	}
+	// 	items = append(items, itemsSeller[idxSeller])
+	// 	idxSeller++
+	// }
+	// for idxBuyer < len(itemsBuyer) {
+	// 	if TransactionsPerPage+1 <= len(items) {
+	// 		break
+	// 	}
+	// 	items = append(items, itemsBuyer[idxBuyer])
+	// 	idxBuyer++
+	// }
 
 	itemDetails := []ItemDetail{}
 	for _, item := range items {
