@@ -1030,8 +1030,8 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 	tx := dbx.MustBegin()
 	items := []Item{}
-	itemsSeller := []Item{}
-	itemsBuyer := []Item{}
+	// itemsSeller := []Item{}
+	// itemsBuyer := []Item{}
 	if itemID > 0 && createdAt > 0 {
 		// paging
 		// err := tx.Select(&items,
@@ -1054,8 +1054,13 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		// 	tx.Rollback()
 		// 	return
 		// }
-		err := tx.Select(&itemsSeller,
-			"SELECT * FROM `items` WHERE `seller_id` = ? AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+
+		err := tx.Select(&items,
+			"SELECT * FROM `items` WHERE `seller_id` = ? AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) UNION ALL SELECT * FROM `items` WHERE `seller_id` = ? AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			user.ID,
+			time.Unix(createdAt, 0),
+			time.Unix(createdAt, 0),
+			itemID,
 			user.ID,
 			time.Unix(createdAt, 0),
 			time.Unix(createdAt, 0),
@@ -1069,20 +1074,35 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = tx.Select(&itemsBuyer,
-			"SELECT * FROM `items` WHERE `buyer_id` = ? AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			user.ID,
-			time.Unix(createdAt, 0),
-			time.Unix(createdAt, 0),
-			itemID,
-			TransactionsPerPage+1,
-		)
-		if err != nil {
-			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "db error")
-			tx.Rollback()
-			return
-		}
+		// err := tx.Select(&itemsSeller,
+		// 	"SELECT * FROM `items` WHERE `seller_id` = ? AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		// 	user.ID,
+		// 	time.Unix(createdAt, 0),
+		// 	time.Unix(createdAt, 0),
+		// 	itemID,
+		// 	TransactionsPerPage+1,
+		// )
+		// if err != nil {
+		// 	log.Print(err)
+		// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		// 	tx.Rollback()
+		// 	return
+		// }
+
+		// err = tx.Select(&itemsBuyer,
+		// 	"SELECT * FROM `items` WHERE `buyer_id` = ? AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+		// 	user.ID,
+		// 	time.Unix(createdAt, 0),
+		// 	time.Unix(createdAt, 0),
+		// 	itemID,
+		// 	TransactionsPerPage+1,
+		// )
+		// if err != nil {
+		// 	log.Print(err)
+		// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
+		// 	tx.Rollback()
+		// 	return
+		// }
 	} else {
 		// 1st page
 		// err := tx.Select(&items,
@@ -1104,7 +1124,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		// }
 
 		err := tx.Select(&items,
-			"SELECT * FROM `items` WHERE `seller_id` = ? UNION SELECT * FROM `items` WHERE `buyer_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			"SELECT * FROM `items` WHERE `seller_id` = ? UNIO ALL SELECT * FROM `items` WHERE `buyer_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 		)
 
 		if err != nil {
