@@ -1672,22 +1672,16 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 	}
 	var wg sync.WaitGroup
 	var scr *APIShipmentCreateRes
+	var ship_err error
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		scr, err = APIShipmentCreate(getShipmentServiceURL(), &APIShipmentCreateReq{
+		scr, ship_err = APIShipmentCreate(getShipmentServiceURL(), &APIShipmentCreateReq{
 			ToAddress:   buyer.Address,
 			ToName:      buyer.AccountName,
 			FromAddress: seller.Address,
 			FromName:    seller.AccountName,
 		})
-		if err != nil {
-			log.Print(err)
-			outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
-			tx.Rollback()
-
-			return
-		}
 	}()
 	pstr, err := APIPaymentToken(getPaymentServiceURL(), &APIPaymentServiceTokenReq{
 		ShopID: PaymentServiceIsucariShopID,
@@ -1722,6 +1716,14 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wg.Wait()
+
+	if ship_err != nil {
+		log.Print(ship_err)
+		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
+		tx.Rollback()
+
+		return
+	}
 
 	_, err = tx.Exec("INSERT INTO `shippings` (`transaction_evidence_id`, `status`, `item_name`, `item_id`, `reserve_id`, `reserve_time`, `to_address`, `to_name`, `from_address`, `from_name`, `img_binary`) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
 		transactionEvidenceID,
