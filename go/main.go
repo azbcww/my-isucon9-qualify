@@ -1033,27 +1033,6 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	itemsSeller := []Item{}
 	itemsBuyer := []Item{}
 	if itemID > 0 && createdAt > 0 {
-		// paging
-		// err := tx.Select(&items,
-		// 	"SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-		// 	user.ID,
-		// 	user.ID,
-		// 	ItemStatusOnSale,
-		// 	ItemStatusTrading,
-		// 	ItemStatusSoldOut,
-		// 	ItemStatusCancel,
-		// 	ItemStatusStop,
-		// 	time.Unix(createdAt, 0),
-		// 	time.Unix(createdAt, 0),
-		// 	itemID,
-		// 	TransactionsPerPage+1,
-		// )
-		// if err != nil {
-		// 	log.Print(err)
-		// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
-		// 	tx.Rollback()
-		// 	return
-		// }
 		err := tx.Select(&itemsSeller,
 			"SELECT * FROM `items` WHERE `seller_id` = ? AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			user.ID,
@@ -1085,23 +1064,6 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// 1st page
-		// err := tx.Select(&items,
-		// 	"SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-		// 	user.ID,
-		// 	user.ID,
-		// 	ItemStatusOnSale,
-		// 	ItemStatusTrading,
-		// 	ItemStatusSoldOut,
-		// 	ItemStatusCancel,
-		// 	ItemStatusStop,
-		// 	TransactionsPerPage+1,
-		// )
-		// if err != nil {
-		// 	log.Print(err)
-		// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
-		// 	tx.Rollback()
-		// 	return
-		// }
 
 		err := tx.Select(&itemsSeller,
 			"SELECT * FROM `items` WHERE `seller_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
@@ -1179,12 +1141,9 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			tx.Rollback()
 			return
 		}
-		// category, err := getCategoryByID(tx, item.CategoryID)
 		category, ok := categories[item.CategoryID]
-		//if err != nil {
-		if ok == false {
+		if !ok {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
-			// tx.Rollback()
 			return
 		}
 
@@ -1228,63 +1187,9 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			tx.Rollback()
 			return
 		}
-		/*
-		if transactionAndShipp.ID > 0 && transactionAndShipp.Status == {
-			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
-				ReserveID: transactionAndShipp.ReserveID,
-			})
-			if err != nil {
-				log.Print(err)
-				outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
-				tx.Rollback()
-				return
-			}
-
-			itemDetail.TransactionEvidenceID = transactionAndShipp.ID
-			itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
-			itemDetail.ShippingStatus = ssr.Status
-		}*/
 		itemDetail.TransactionEvidenceID = transactionAndShipp.ID
 		itemDetail.TransactionEvidenceStatus = transactionAndShipp.Status
 		itemDetail.ShippingStatus = transactionAndShipp.SStatus
-
-		// transactionEvidence := TransactionEvidence{}
-		// err = tx.Get(&transactionEvidence, "SELECT * FROM `transaction_evidences` WHERE `item_id` = ?", item.ID)
-		// if err != nil && err != sql.ErrNoRows {
-		// 	// It's able to ignore ErrNoRows
-		// 	log.Print(err)
-		// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
-		// 	tx.Rollback()
-		// 	return
-
-		// if transactionEvidence.ID > 0 {
-		// 	shipping := Shipping{}
-		// 	err = tx.Get(&shipping, "SELECT * FROM `shippings` WHERE `transaction_evidence_id` = ?", transactionEvidence.ID)
-		// 	if err == sql.ErrNoRows {
-		// 		outputErrorMsg(w, http.StatusNotFound, "shipping not found")
-		// 		tx.Rollback()
-		// 		return
-		// 	}
-		// 	if err != nil {
-		// 		log.Print(err)
-		// 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
-		// 		tx.Rollback()
-		// 		return
-		// 	}
-		// 	ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
-		// 		ReserveID: shipping.ReserveID,
-		// 	})
-		// 	if err != nil {
-		// 		log.Print(err)
-		// 		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
-		// 		tx.Rollback()
-		// 		return
-		// 	}
-
-		// 	itemDetail.TransactionEvidenceID = transactionEvidence.ID
-		// 	itemDetail.TransactionEvidenceStatus = transactionEvidence.Status
-		// 	itemDetail.ShippingStatus = ssr.Status
-		// }
 
 		itemDetails = append(itemDetails, itemDetail)
 	}
